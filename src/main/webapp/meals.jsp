@@ -1,51 +1,42 @@
-<%@ page import="java.util.List" %>
-<%@ page import="ru.javawebinar.topjava.model.MealTo" %><%--
-  Created by IntelliJ IDEA.
-  User: Artur May
-  Date: 03.06.2022
-  Time: 19:39
-  To change this template use File | Settings | File Templates.
---%>
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-...
+<%@ page contentType="text/html;charset=UTF-8" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/fmt" prefix="fmt" %>
 <html>
 <head>
-    <title>Title</title>
+    <title>Meals</title>
+    <link rel='stylesheet' href='style.css' type='text/css'/>
 </head>
 <body>
-    <table border="1" cellpadding="2" cellspacing="2">
-        <tr>
-            <th>Description</th>
-            <th>Date</th>
-            <th>Calories</th>
-            <th>Excess</th>
+<h3><a href="index.html">Home</a></h3>
+<hr>
+<h2>Meals</h2>
+<a href="meals?action=new">Add Meal</a>
+<br/>
+<table>
+    <tr>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Calories</th>
+        <th></th>
+        <th></th>
+    </tr>
+
+    <c:forEach items="${meals}" var="meal">
+        <tr style="color:${ meal.excess ? 'red' : 'green'}">
+            <td>
+                <jsp:useBean id="dateTimeFormatter" scope="request" type="java.time.format.DateTimeFormatter"/>
+                <c:out value="${meal.dateTime.format(dateTimeFormatter)}"/>
+            </td>
+            <td>
+                    ${meal.description}
+            </td>
+            <td>
+                    ${meal.calories}
+            </td>
+            <td><a href="meals?action=edit&id=${meal.id}">Edit</a></td>
+            <td><a href="meals?action=delete&id=${meal.id}">Delete</a></td>
         </tr>
-        <c:forEach items="${mealsTo}" var="meal">
-            <tr>
-                <td>${meal.description}</td>
-                <td>${meal.dateTime}</td>
-                <td>${meal.calories}</td>
-                <td>${meal.excess}</td>
-            </tr>
-        </c:forEach>
-
-    </table>
-
-
+    </c:forEach>
+</table>
 </body>
 </html>
-
-<%--
-<tr>
-    <th>Description</th>
-    <th>Date</th>
-    <th>Calories</th>
-</tr>
-<c:forEach items="${mealsTo}" var="meal">
-    <tr>
-        <td>${meal.description}</td>
-        <td>${meal.dateTime}</td>
-        <td>${meal.calories}</td>
-    </tr>
-</c:forEach>--%>

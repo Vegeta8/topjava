@@ -3,6 +3,8 @@ package ru.javawebinar.topjava.web;
 import org.slf4j.Logger;
 import ru.javawebinar.topjava.model.Meal;
 import ru.javawebinar.topjava.model.MealTo;
+import ru.javawebinar.topjava.repository.MealRepository;
+import ru.javawebinar.topjava.repository.MemoryMealRepository;
 import ru.javawebinar.topjava.util.MealsUtil;
 import ru.javawebinar.topjava.util.TimeUtil;
 
@@ -16,6 +18,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Month;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,29 +29,80 @@ import java.util.stream.Collectors;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class MealsServlet extends HttpServlet {
-    private static final Logger log = getLogger(UserServlet.class);
-    MealsUtil mealsUtil = new MealsUtil();
+    private static final Logger log = getLogger(MealsServlet.class);
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final String LIST_MEAL = "meals.jsp";
+    private static final String FORM_MEAL = "formMeal.jsp";
+    private static final String URL_LIST_MEAL = "meals";
+
+    private MealRepository mealRepository;
+
     @Override
-    public void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        log.debug("redirect to meals");
-        int excess = 2000;
-        List<Meal> meals = Arrays.asList(
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 30, 10, 0), "Завтрак", 500),
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 30, 13, 0), "Обед", 1000),
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 30, 20, 0), "Ужин", 500),
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 31, 0, 0), "Еда на граничное значение", 100),
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 31, 10, 0), "Завтрак", 1000),
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 31, 13, 0), "Обед", 500),
-                new Meal(LocalDateTime.of(2020, Month.JANUARY, 31, 20, 0), "Ужин", 410)
-        );
-        Map<LocalDate, Integer> caloriesSumByDate = meals.stream()
-                .collect(
-                        Collectors.groupingBy(Meal::getDate, Collectors.summingInt(Meal::getCalories))
-                );
-        List<MealTo> mealsTo = meals.stream()
-                .map(meal -> mealsUtil.createTo(meal, caloriesSumByDate.get(meal.getDate()) > excess))
-                .collect(Collectors.toList());
-        request.setAttribute("mealsTo", mealsTo);
-        request.getRequestDispatcher("meals.jsp").forward(request, response);
+    public void init() {
+        this.mealRepository = new MemoryMealRepository();
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        log.debug("doGet()");
+        String action = request.getParameter("action");
+        action = action != null ? action.toLowerCase() : "";
+        String forward;
+
+        switch (action) {
+            case "new":
+                log.debug("redirect to meals/new");
+                forward = FORM_MEAL;
+                request.setAttribute("meal", new Meal(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES), "", 0));
+                request.getRequestDispatcher(forward).forward(request, response);
+                break;
+            case "edit": {
+                forward = FORM_MEAL;
+                int id = getIdFromRequest(request);
+                log.debug("redirect to meals/edit {}", id);
+                mealRepository.getById(id).ifPresent(value -> request.setAttribute("meal", value));
+                request.getRequestDispatcher(forward).forward(request, response);
+                break;
+            }
+            case "delete": {
+                int id = getIdFromRequest(request);
+                log.debug("redirect to meals/delete {}", id);
+                mealRepository.delete(id);
+                response.sendRedirect(URL_LIST_MEAL);
+            }
+            break;
+            default:
+                log.debug("redirect to meals");
+                forward = LIST_MEAL;
+                List<MealTo> mealsTo = MealsUtil.filteredByStreams(mealRepository.getAll(), LocalTime.MIN, LocalTime.MAX,
+                        MealsUtil.CALORIES_PER_DAY);
+                request.setAttribute("meals", mealsTo);
+                request.setAttribute("dateTimeFormatter", DATE_TIME_FORMATTER);
+                request.getRequestDispatcher(forward).forward(request, response);
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        log.debug("doPost()");
+        request.setCharacterEncoding("UTF-8");
+
+        Meal meal = new Meal(LocalDateTime.parse(request.getParameter("dateTime")),
+                request.getParameter("description"), Integer.parseInt(request.getParameter("calories")));
+        String id = request.getParameter("id");
+
+        if (id == null || id.isEmpty()) {
+            log.debug("insert()");
+            mealRepository.insert(meal);
+        } else {
+            log.debug("update() {}", id);
+            meal.setId(Integer.parseInt(id));
+            mealRepository.update(meal);
+        }
+        response.sendRedirect(URL_LIST_MEAL);
+    }
+
+    private int getIdFromRequest(HttpServletRequest request) {
+        return Integer.parseInt(request.getParameter("id"));
     }
 }
